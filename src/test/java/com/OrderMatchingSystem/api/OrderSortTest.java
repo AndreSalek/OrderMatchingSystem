@@ -1,16 +1,12 @@
 package com.OrderMatchingSystem.api;
 
-import OrderMatchingLibrary.Models.MarketMaker;
-import OrderMatchingLibrary.Models.OrderSortFIFO;
+import OrderMatchingLibrary.Models.*;
 import OrderMatchingLibrary.Models.Order;
-import OrderMatchingLibrary.OrderType;
 import org.junit.jupiter.api.*;
-import org.springframework.aop.aspectj.annotation.PrototypeAspectInstanceFactory;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.util.Assert;
 
 import java.math.BigDecimal;
-import java.util.Collections;
+import java.math.RoundingMode;
 import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
@@ -23,35 +19,36 @@ class OrderSortTest {
 	@Test
 	void orderCollectionIsSortedLowestFirst() {
 		Comparator<Order> comparator = new OrderSortFIFO();
+		Order.OrderBuilder builder = new Order.OrderBuilder();
+		BigDecimalProcessor processor = new BigDecimalProcessor(5,3, RoundingMode.UP);
+		OrderCalculator calc = new OrderCalculator(processor);
 		List<Order> list = new LinkedList<Order>();
 		String pair = "USD/BTC";
 
-		BigDecimal limitPrice = new BigDecimal("10123.1");
+		BigDecimal expectedResult = new BigDecimal("8400");
+		BigDecimal o1Total = BigDecimal.valueOf(15500);
+		BigDecimal o2Quantity = BigDecimal.valueOf(0.8);
+		BigDecimal o1limitPrice = BigDecimal.valueOf(10600);
+		BigDecimal o2limitPrice = BigDecimal.valueOf(10500);
 
-		BigDecimal fee = limitPrice.multiply(BigDecimal.valueOf(MarketMaker.MARKET_MAKER_FEE));
+		BigDecimal o1Quantity= calc.calculateQuantityForTotal(o1limitPrice,o1Total);
+		BigDecimal o2Total = calc.calculateTotalForQuantity(o2limitPrice, o2Quantity);
 
-		Order o1 = new Order(pair,
-							new BigDecimal("10123.1"),
-							new BigDecimal("1.1"),
-							new BigDecimal(String.valueOf(limitPrice)).multiply(BigDecimal.valueOf(1.1)),
-							OrderType.Ask,
-							fee
-							);
-		BigDecimal fee1 = limitPrice.multiply(BigDecimal.valueOf(MarketMaker.MARKET_MAKER_FEE));
-		Order o2 = new Order(pair,
-				new BigDecimal("9020"),
-				new BigDecimal("1.2"),
-				new BigDecimal(String.valueOf(limitPrice)).multiply(BigDecimal.valueOf(1.1)),
-				OrderType.Ask,
-				fee1
-		);
+		Order o1 =builder.setPair(pair).
+				setLimitPrice(o1limitPrice).
+				setQuantity(o1Quantity).
+				setTotalPrice(o1Total)
+				.createOrder();
+		Order o2 = builder.setPair(pair)
+				.setLimitPrice(o2limitPrice)
+				.setQuantity(o2Quantity)
+				.setTotalPrice(o2Total)
+				.createOrder();
 		list.add(o1);
 		list.add(o2);
 		list.sort(comparator);
 
-		boolean lowestIsFirst = list.getFirst().limitPrice.equals(new BigDecimal("9020"));
-
+		boolean lowestIsFirst = list.getFirst().getTotalPrice().stripTrailingZeros().toPlainString().equals(expectedResult.toString());
 		assertTrue(lowestIsFirst);
 	}
-
 }
